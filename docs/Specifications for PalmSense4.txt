@@ -1,0 +1,23 @@
+Good day, Dr Ebrahim
+
+We are using a Metro Ohm Autolab with the Nova 2.1 software.
+For the detection of oseltamivir and efavirenz.
+
+These were the operational conditions.
+
+Mode: Differential pulse voltammetry
+Start potential: 0.8 Vref
+Stop potential: 1.3 Vref
+Step: 0,005 V
+
+Modulation amplitude: 0.025V
+
+Modulation time: 0.05s
+
+Interval time: 0.5s
+
+Estimated number: 99
+
+Estimated duration: 49.5s
+
+Scan rate: 0.010071V/s

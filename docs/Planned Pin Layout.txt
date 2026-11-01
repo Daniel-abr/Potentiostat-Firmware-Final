@@ -1,0 +1,32 @@
+ESP32: Waveshare ESP32-S3-DEV-KIT-N32R16V-M
+
+ESP GPIO 9 - RESET of the AD9541
+ESP GPIO 10 - CS of the AD9541
+ESP GPIO 11 - MOSI of the AD9541
+ESP GPIO 12 - SCLK of the AD9541
+ESP GPIO 13 - MISO of the AD9541
+ESP GPIO 14 - GPIO0 of the AD9541
+
+Display: DF Robot Fermion: 1.8" TFT LCD Display
+
+ESP GPIO 1 - DC pin of my display
+ESP GPIO 2 - SDCS of my display
+ESP GPIO 42 - CS of my display
+ESP GPIO 41 - MISO of my display
+ESP GPIO 40 - MOSI of my display
+ESP GPIO 39 - SCLK of my display
+ESP GPIO 38 - RES of my display
+
+ESP GPIO 5 - BLK of my display
+
+Rotary encoder
+Switch ESP GPIO 16
+A : ESP GPIO 15
+B : ESP GPIO 7
+
+
+Switch 1
+ESP GPIO 17
+
+Switch 2
+ESP GPIO 18

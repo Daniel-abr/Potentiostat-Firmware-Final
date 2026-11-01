@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OpenStat — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:        #f6f8f7;
+    --panel:     #ffffff;
+    --panel-2:   #f0f4f2;
+    --border:    #e3e8e5;
+    --text:      #16211c;
+    --text-dim:  #6b7a74;
+    --teal:      #0f9e75;
+    --teal-bg:   #e4f5ee;
+    --blue:      #2f6fed;
+    --blue-bg:   #eaf0fe;
+    --amber:     #c07a12;
+    --amber-bg:  #fdf2e2;
+    --red:       #d64545;
+    --red-bg:    #fce9e9;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    display:grid;
+    grid-template-columns: 280px 1fr 300px;
+    grid-template-rows: 64px 1fr 230px;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "sidebar main controls"
+      "sidebar results controls";
+    height:100vh;
+    gap:14px;
+    padding:14px;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+  }
+
+  .topbar{ grid-area:topbar; display:flex; align-items:center; justify-content:space-between; padding:0 22px; }
+  .brand{ display:flex; align-items:center; gap:11px; }
+  .brand .mark{ width:32px; height:32px; border-radius:9px; background:var(--teal-bg); display:flex; align-items:center; justify-content:center; }
+  .brand .mark svg{ width:16px; height:16px; }
+  .brand h1{ font-family:var(--display); font-size:16px; font-weight:700; margin:0; }
+  .brand .sub{ color:var(--text-dim); font-size:12px; font-family:var(--mono); margin-left:4px;}
+
+  .status-cluster{ display:flex; gap:10px; align-items:center; }
+  .pill{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:500; padding:6px 12px; border-radius:20px; }
+  .pill.teal{ background:var(--teal-bg); color:var(--teal); }
+  .pill.blue{ background:var(--blue-bg); color:var(--blue); }
+  .pill.amber{ background:var(--amber-bg); color:var(--amber); }
+  .pill.red{ background:var(--red-bg); color:var(--red); }
+  .pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .sidebar{ grid-area:sidebar; padding:20px 18px; overflow-y:auto; }
+  .eyebrow{ font-size:11px; font-weight:600; letter-spacing:0.04em; color:var(--text-dim); text-transform:uppercase; margin:0 0 10px 2px; }
+  .nav-tabs{ display:flex; flex-direction:column; gap:4px; margin-bottom:24px;}
+  .nav-tab{ padding:10px 12px; border-radius:10px; font-size:13.5px; font-weight:500; color:var(--text-dim); cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+  .nav-tab.active{ background:var(--teal-bg); color:var(--teal); }
+  .nav-tab .count{ font-size:11px; font-weight:600; background:var(--panel-2); color:var(--text-dim); padding:1px 7px; border-radius:10px; }
+  .nav-tab.active .count{ background:#ffffff; color:var(--teal); }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; font-weight:500; }
+  .field select, .field input{ width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:9px; font-size:13.5px; font-family:var(--sans); }
+  .field select:focus, .field input:focus{ outline:none; border-color:var(--teal); }
+  .field .row{ display:flex; gap:8px; }
+  .field .row > div{ flex:1; }
+
+  .btn-primary{ width:100%; padding:12px; border-radius:10px; border:none; background:var(--teal); color:#ffffff; font-weight:600; font-size:13.5px; cursor:pointer; margin-top:6px; }
+  .btn-primary.stop{ background:var(--red); }
+  .btn-ghost{ width:100%; padding:10px; border-radius:10px; margin-top:8px; background:transparent; border:1px solid var(--border); color:var(--text-dim); font-size:13px; cursor:pointer; font-weight:500; }
+
+  .main{ grid-area:main; padding:20px 22px; display:flex; flex-direction:column; }
+  .main-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;}
+  .main-head h2{ font-family:var(--display); font-size:15px; margin:0 0 4px; font-weight:700; display:flex; align-items:center; gap:8px;}
+  .rec-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--red); opacity:0; }
+  .rec-dot.active{ opacity:1; animation:recPulse 1s ease-in-out infinite; }
+  @keyframes recPulse{ 0%,100%{ transform:scale(1); opacity:1;} 50%{ transform:scale(1.5); opacity:0.35;} }
+
+  .progress-track{ height:6px; background:var(--panel-2); border-radius:6px; overflow:hidden; margin-bottom:12px; }
+  .progress-fill{ height:100%; width:0%; background:var(--teal); border-radius:6px; transition:width 0.25s ease; position:relative; overflow:hidden; }
+  .progress-fill.active::after{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    animation:shimmer 1.1s linear infinite;
+  }
+  @keyframes shimmer{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(100%);} }
+  .main-head p{ font-size:12.5px; color:var(--text-dim); margin:0; }
+  .reading-block{ text-align:right; }
+  .reading{ font-family:var(--mono); font-size:24px; color:var(--teal); font-weight:600; }
+  .reading span{ font-size:12px; color:var(--text-dim); margin-left:4px; font-weight:400; font-family:var(--sans);}
+  .chart-wrap{ flex:1; position:relative; }
+  .scan-info{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .stat-chip{ background:var(--panel-2); border-radius:10px; padding:8px 12px; flex:1; min-width:110px; }
+  .stat-chip .label{ font-size:10.5px; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;}
+  .stat-chip .value{ font-family:var(--mono); font-size:14px; font-weight:600; margin-top:2px; }
+
+  .results{ grid-area:results; padding:16px 22px 18px; overflow-y:auto; }
+  .results-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .results-head h2{ font-family:var(--display); font-size:14px; margin:0; font-weight:700;}
+  .search-mini{ background:var(--panel-2); border:1px solid var(--border); border-radius:9px; color:var(--text); font-size:12.5px; padding:6px 12px; width:180px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; font-weight:600; color:var(--text-dim); font-size:10.5px; text-transform:uppercase; letter-spacing:0.03em; padding:8px 10px; border-bottom:1px solid var(--border); }
+  td{ padding:9px 10px; border-bottom:1px solid var(--border); }
+  tr:hover td{ background:var(--panel-2); }
+  .tag{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .tag.dpv{ background:var(--teal-bg); color:var(--teal); }
+  /* .tag.cv/.swv/.lsv removed (item K) — the firmware only ever runs DPV;
+     kept .tag.dpv since old saved results may still carry a non-DPV tech
+     string from before this change (tagClass below falls back to it). */
+  .row-actions{ display:flex; gap:6px; }
+  .icon-btn{ background:var(--panel-2); border:1px solid var(--border); color:var(--text-dim); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:12px; font-weight:500; }
+  .icon-btn:hover{ color:var(--teal); border-color:var(--teal); background:var(--teal-bg); }
+  .status-dot{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; }
+  .status-dot .d{ width:6px; height:6px; border-radius:50%; }
+  .status-dot.ok .d{ background:var(--teal); }
+  .status-dot.flag .d{ background:var(--amber); }
+
+  .controls{ grid-area:controls; padding:20px 18px; overflow-y:auto; }
+  .device-card{ background:var(--panel-2); border-radius:14px; padding:14px; margin-bottom:18px; }
+  .device-card .row{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:8px; }
+  .device-card .row span:first-child{ color:var(--text-dim); }
+  .device-card .row span:last-child{ font-weight:600; font-family:var(--mono); font-size:12px;}
+  .bar-bg{ height:6px; background:#ffffff; border-radius:6px; overflow:hidden; margin-top:8px;}
+  .bar-fill{ height:100%; background:var(--teal); width:0%; border-radius:6px; transition:width 0.2s;}
+
+  .toggle-row{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
+  .toggle-row:last-child{ border-bottom:none; }
+  .switch{ width:36px; height:20px; border-radius:20px; background:var(--panel-2); border:1px solid var(--border); position:relative; cursor:pointer; }
+  .switch.on{ background:var(--teal); border-color:var(--teal); }
+  .switch .knob{ width:14px; height:14px; border-radius:50%; background:#ffffff; position:absolute; top:2px; left:2px; transition:0.15s; box-shadow:0 1px 2px rgba(0,0,0,0.15); }
+  .switch.on .knob{ left:18px; }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  /* Item H — Wi-Fi networks modal */
+  .wifi-modal-backdrop{ position:fixed; inset:0; background:rgba(22,33,28,0.45); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .wifi-modal{ width:420px; max-width:92vw; max-height:86vh; overflow-y:auto; padding:22px 24px; }
+  .wifi-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .wifi-modal-head h2{ font-family:var(--display); font-size:15px; margin:0; font-weight:700; }
+  .wifi-slot{ display:flex; gap:8px; margin-bottom:10px; align-items:flex-end; }
+  .wifi-slot > div{ flex:1; }
+  .wifi-slot label{ display:block; font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+  .wifi-slot input{ width:100%; background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:8px 9px; border-radius:8px; font-size:13px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar panel">
+    <div class="brand">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0f9e75" stroke-width="2" stroke-linecap="round"><path d="M4 14h4l2-8 4 16 2-8h4"/></svg>
+      </div>
+      <h1>OpenStat</h1>
+      <span class="sub">esp32-s3 · N32R16V</span>
+    </div>
+    <div class="status-cluster">
+      <div class="pill" id="wsPill"><span class="dot"></span><span id="wsText">Connecting…</span></div>
+      <div class="pill blue"><span class="dot"></span><span id="sdPill">SD —</span></div>
+      <div class="pill amber"><span class="dot"></span><span id="wifiPill">Wi-Fi —</span></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar panel">
+    <p class="eyebrow">View</p>
+    <div class="nav-tabs">
+      <div class="nav-tab active">Live sweep <span class="count">●</span></div>
+      <div class="nav-tab">Saved results <span class="count" id="savedCount">0</span></div>
+      <div class="nav-tab" id="deviceSettingsTab">Device settings</div>
+    </div>
+
+    <p class="eyebrow">Technique</p>
+    <div class="field">
+      <!-- Firmware only ever implements DPV (AD5941::configureSweep() has
+           no other waveform path) — shown as a fixed badge rather than a
+           dropdown that implied CV/SWV/LSV actually did something
+           different. -->
+      <span class="tag dpv">Differential pulse (DPV)</span>
+    </div>
+
+    <p class="eyebrow">Waveform parameters</p>
+    <div class="field row">
+      <div><label>Start (V)</label><input id="startV" value="-0.20"></div>
+      <div><label>End (V)</label><input id="endV" value="0.60"></div>
+    </div>
+    <div class="field row">
+      <div><label>Step (mV)</label><input id="stepMv" value="5"></div>
+      <div><label>Pulse amp (mV)</label><input id="pulseAmpMv" value="50"></div>
+    </div>
+    <div class="field row">
+      <div><label>Pulse width (ms)</label><input id="pulseWidthMs" value="50"></div>
+      <div><label>Interval (ms)</label><input id="intervalMs" value="500"></div>
+    </div>
+    <div class="field">
+      <label>Equilibration (ms)</label>
+      <input id="equilibrationMs" value="10000">
+    </div>
+    <div class="field" style="display:flex; align-items:center; justify-content:space-between;">
+      <label style="margin:0;" for="autoRange">Auto-range RTIA</label>
+      <input type="checkbox" id="autoRange" checked style="width:auto;">
+    </div>
+    <div class="field">
+      <label for="fixedRtiaCode">Fixed RTIA (when auto-range is off)</label>
+      <select id="fixedRtiaCode" disabled>
+        <option value="0">200 ohm</option>
+        <option value="1">1 kohm</option>
+        <option value="2">5 kohm</option>
+        <option value="3" selected>10 kohm</option>
+        <option value="4">20 kohm</option>
+        <option value="5">40 kohm</option>
+        <option value="6">80 kohm</option>
+        <option value="7">160 kohm</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Sample label</label>
+      <input id="sampleLabel" value="Pb2+_trace_04">
+    </div>
+
+    <button class="btn-primary" id="startBtn">Start sweep</button>
+    <button class="btn-ghost" id="presetBtn">Save as preset</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main panel">
+    <div class="main-head">
+      <div>
+        <h2>Live voltammogram <span class="rec-dot" id="recDot"></span></h2>
+        <p id="sweepInfo">Idle</p>
+      </div>
+      <div class="reading-block">
+        <div class="reading" id="curReading">0.0<span>nA</span></div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;" id="curVoltage">at 0.000 V vs ref</div>
+      </div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="chart-wrap">
+      <canvas id="voltammogram"></canvas>
+    </div>
+    <div class="scan-info">
+      <div class="stat-chip"><div class="label">Elapsed</div><div class="value" id="elapsed">00:00</div></div>
+      <div class="stat-chip"><div class="label">Progress</div><div class="value" id="progress">0%</div></div>
+      <div class="stat-chip"><div class="label">Points</div><div class="value" id="pointsChip">0 / 0</div></div>
+      <div class="stat-chip"><div class="label">Peak Δi</div><div class="value" id="peakChip" style="color:var(--teal);">0.0 nA</div></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results panel">
+    <div class="results-head">
+      <h2>Saved results</h2>
+      <input class="search-mini" id="resultsFilter" placeholder="Filter filename…">
+    </div>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Technique</th><th>Date</th><th>Peak Δi</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls panel">
+    <p class="eyebrow">Analog front-end</p>
+    <div class="device-card">
+      <div class="row"><span>TIA gain</span><span id="tiaGain">—</span></div>
+      <div class="row"><span>ADC range</span><span id="adcRange">—</span></div>
+      <div class="row"><span>Range correction</span><span id="rangeCorrection">—</span></div>
+      <div class="row"><span>Heap used</span><span id="heapUsed">—</span></div>
+      <div class="bar-bg"><div class="bar-fill" id="heapBar"></div></div>
+    </div>
+
+    <p class="eyebrow">Display and connectivity</p>
+    <div class="toggle-row">Onboard TFT mirror <div class="switch on" data-key="tft"><div class="knob"></div></div></div>
+    <div class="toggle-row">Web socket live stream <div class="switch on" data-key="ws_stream"><div class="knob"></div></div></div>
+    <div class="toggle-row">Auto-save to flash <div class="switch on" data-key="autosave"><div class="knob"></div></div></div>
+
+    <p class="eyebrow" style="margin-top:18px;">Danger zone</p>
+    <button class="btn-ghost" id="eraseBtn" style="border-color:#f3c9c9; color:var(--red);">Erase saved results</button>
+    <button class="btn-ghost" id="restartBtn">Restart device</button>
+  </div>
+
+</div>
+
+<!-- DEVICE SETTINGS (item H) — Wi-Fi networks. A modal rather than a 4th
+     grid panel: the page's layout is a fixed 3-column/3-row CSS grid with
+     no spare area to put one in without reworking that grid. -->
+<div id="wifiModalBackdrop" class="wifi-modal-backdrop" style="display:none;">
+  <div class="wifi-modal panel">
+    <div class="wifi-modal-head">
+      <h2>Saved Wi-Fi networks</h2>
+      <button class="icon-btn" id="wifiModalClose">Close</button>
+    </div>
+    <p style="font-size:12.5px; color:var(--text-dim); margin:0 0 14px;">
+      Tried in order at boot, strongest visible signal first. Passwords are
+      never sent back to the browser — leave a password field blank to keep
+      that network's existing password unchanged; blank both fields to
+      remove that slot. Takes effect on next restart, not live.
+    </p>
+    <div id="wifiSlots"></div>
+    <button class="btn-primary" id="wifiSaveBtn" style="margin-top:4px;">Save networks</button>
+  </div>
+</div>
+
+<script>
+/* ---------------- WebSocket link to the ESP32 firmware ---------------- */
+let ws = null;
+let sweepRunning = false;
+let currentSweepPoints = [];
+let maxPoints = 0;
+
+function wsConnect(){
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => setWsStatus(true);
+  ws.onclose = () => { setWsStatus(false); setTimeout(wsConnect, 1500); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (evt) => handleMessage(JSON.parse(evt.data));
+}
+
+function setWsStatus(ok){
+  const pill = document.getElementById('wsPill');
+  const text = document.getElementById('wsText');
+  pill.className = 'pill ' + (ok ? 'teal' : 'red');
+  text.textContent = ok ? 'Device linked' : 'Disconnected';
+}
+
+function handleMessage(msg){
+  switch(msg.type){
+    case 'status':
+      document.getElementById('sdPill').textContent = msg.sdReady
+        ? `SD ${(msg.sdUsedKB/1024/1024).toFixed(2)} / ${(msg.sdTotalKB/1024/1024).toFixed(1)} GB`
+        : 'SD not detected';
+      document.getElementById('sdPill').className = 'pill ' + (msg.sdReady ? 'blue' : 'red');
+      document.getElementById('wifiPill').textContent = `Wi-Fi ${msg.rssi ?? '—'} dBm`;
+      document.getElementById('tiaGain').textContent = (msg.tiaGain ?? '—') + (msg.rtiaAtMaxRange ? ' (max)' : '');
+      document.getElementById('adcRange').textContent = msg.adcRange ?? '—';
+      document.getElementById('rangeCorrection').textContent = (msg.rangeCorrection ?? 1).toFixed(4) + '×';
+      document.getElementById('heapUsed').textContent = `${msg.heapUsedKB ?? '—'} / ${msg.heapTotalKB ?? '—'} KB`;
+      document.getElementById('heapBar').style.width = `${msg.heapPct ?? 0}%`;
+      break;
+    case 'sweep_start':
+      sweepRunning = true;
+      currentSweepPoints = [];
+      maxPoints = msg.totalPoints;
+      {
+        const rtia = msg.rtiaOhms ?? 0;
+        const rtiaTxt = rtia >= 1000 ? `${(rtia/1000).toFixed(rtia % 1000 ? 1 : 0)}kΩ` : `${rtia}Ω`;
+        document.getElementById('sweepInfo').textContent =
+          `Sweep #${msg.sweepId} · ${msg.label} (${msg.technique}) · RTIA ${rtiaTxt}${msg.rtiaAtMaxRange ? ' [max range]' : ''}`;
+      }
+      document.getElementById('startBtn').textContent = 'Stop sweep';
+      document.getElementById('startBtn').classList.add('stop');
+      document.getElementById('recDot').classList.add('active');
+      document.getElementById('progressFill').classList.add('active');
+      document.getElementById('progressFill').style.width = '0%';
+      resetChart();
+      break;
+    case 'sweep_point':
+      currentSweepPoints.push({v: msg.v, i: msg.i});
+      updateChart();
+      document.getElementById('curReading').innerHTML = `${msg.i.toFixed(1)}<span>nA</span>`;
+      document.getElementById('curVoltage').textContent = `at ${msg.v.toFixed(3)} V vs ref`;
+      document.getElementById('elapsed').textContent = formatTime(msg.elapsedMs);
+      document.getElementById('progress').textContent = `${msg.progressPct}%`;
+      document.getElementById('progressFill').style.width = `${msg.progressPct}%`;
+      document.getElementById('pointsChip').textContent = `${currentSweepPoints.length} / ${maxPoints}`;
+      const peak = Math.max(...currentSweepPoints.map(p=>p.i));
+      document.getElementById('peakChip').textContent = `${peak.toFixed(1)} nA`;
+      break;
+    case 'sweep_done':
+      sweepRunning = false;
+      document.getElementById('startBtn').textContent = 'Start sweep';
+      document.getElementById('startBtn').classList.remove('stop');
+      document.getElementById('recDot').classList.remove('active');
+      document.getElementById('progressFill').classList.remove('active');
+      stopTipPulse();
+      if (msg.result) prependResultRow(msg.result);
+      break;
+    case 'results_list':
+      renderResults(msg.results || []);
+      break;
+    case 'wifi_list':
+      renderWifiSlots(msg.ssids || []);
+      break;
+    default:
+      console.log('Unhandled message', msg);
+  }
+}
+
+function formatTime(ms){
+  const s = Math.floor(ms/1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function sendCmd(cmd, payload={}){
+  if (ws && ws.readyState === WebSocket.OPEN){
+    ws.send(JSON.stringify({cmd, ...payload}));
+  }
+}
+
+/* ---------------- Chart ---------------- */
+let chart;
+function resetChart(){
+  chart.data.labels = [];
+  chart.data.datasets[0].data = [];
+  chart.data.datasets[1].data = [];
+  chart.update('none');
+}
+function updateChart(){
+  chart.data.labels = currentSweepPoints.map(p => p.v.toFixed(3));
+  chart.data.datasets[0].data = currentSweepPoints.map(p => p.i);
+  // pulsing marker sits only at the newest point; every earlier index is null
+  // so Chart.js (category axis) doesn't draw a connecting line for it.
+  chart.data.datasets[1].data = currentSweepPoints.map((p, idx) =>
+    idx === currentSweepPoints.length - 1 ? p.i : null
+  );
+  chart.update('none');
+  startTipPulse();
+}
+
+let tipPulsePhase = 0;
+let tipInterval = null;
+function startTipPulse(){
+  if (tipInterval || !sweepRunning) return;
+  tipInterval = setInterval(() => {
+    tipPulsePhase += 0.35;
+    chart.data.datasets[1].pointRadius = 4 + 3 * Math.abs(Math.sin(tipPulsePhase));
+    chart.update('none');
+  }, 80);
+}
+function stopTipPulse(){
+  if (tipInterval) { clearInterval(tipInterval); tipInterval = null; }
+  if (chart) { chart.data.datasets[1].data = []; chart.update('none'); }
+}
+
+const ctx = document.getElementById('voltammogram').getContext('2d');
+chart = new Chart(ctx, {
+  type:'line',
+  data:{
+    labels:[],
+    datasets:[
+      { data:[], borderColor:'#0f9e75', backgroundColor:'rgba(15,158,117,0.06)', fill:true, borderWidth:2, pointRadius:0, tension:0.2 },
+      { data:[], borderColor:'transparent', backgroundColor:'#0f9e75', pointBackgroundColor:'#0f9e75', pointBorderColor:'#ffffff', pointBorderWidth:1, pointRadius:0, showLine:false, order:0 }
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, animation:false,
+    interaction:{ intersect:false },
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ title:{ display:true, text:'Potential (V vs Ref)', color:'#6b7a74', font:{family:'Inter', size:11.5} }, ticks:{ color:'#6b7a74', maxTicksLimit:9, font:{family:'IBM Plex Mono', size:10.5} }, grid:{ color:'#eef1f0' } },
+      y:{ title:{ display:true, text:'ΔI (nA)', color:'#6b7a74', font:{family:'Inter', size:11.5} }, ticks:{ color:'#6b7a74', font:{family:'IBM Plex Mono', size:10.5} }, grid:{ color:'#eef1f0' } }
+    }
+  }
+});
+
+/* ---------------- Results table ---------------- */
+// Only 'dpv' styling exists now (item K) — a legacy non-DPV tech string
+// from a result saved before this change still falls back to it below.
+const tagClass = { DPV:'dpv' };
+function renderResults(list){
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+  document.getElementById('savedCount').textContent = list.length;
+  list.forEach(r => tbody.appendChild(buildRow(r)));
+}
+function prependResultRow(r){
+  const tbody = document.getElementById('resultsBody');
+  tbody.insertBefore(buildRow(r), tbody.firstChild);
+  const el = document.getElementById('savedCount');
+  el.textContent = (parseInt(el.textContent||'0') + 1);
+}
+function buildRow(r){
+  const tr = document.createElement('tr');
+  const statusLabel = r.status === 'ok' ? 'Complete' : (r.status === 'overload' ? 'Overload' : 'Flagged');
+  const statusClass = r.status === 'ok' ? 'ok' : 'flag';
+  tr.innerHTML = `
+    <td>${r.file}</td>
+    <td><span class="tag ${tagClass[r.tech] || 'dpv'}">${r.tech}</span></td>
+    <td style="color:var(--text-dim);">${r.date}</td>
+    <td style="font-family:var(--mono);">${r.peak}</td>
+    <td><span class="status-dot ${statusClass}"><span class="d"></span>${statusLabel}</span></td>
+    <td class="row-actions">
+      <button class="icon-btn" onclick="window.open('/download?file=${encodeURIComponent(r.file)}','_blank')">Download</button>
+      <button class="icon-btn" style="color:var(--red);" onclick="if(confirm('Delete ${r.file}? This cannot be undone.')) sendCmd('delete_result',{file:'${r.file}'})">Delete</button>
+    </td>`;
+  return tr;
+}
+
+/* ---------------- Controls ---------------- */
+// Fixed RTIA select only matters (and is only enabled) while auto-range is
+// off — matches the TFT Parameters screen's own AUTO/fixed-code field.
+const autoRangeEl = document.getElementById('autoRange');
+const fixedRtiaEl = document.getElementById('fixedRtiaCode');
+function syncFixedRtiaEnabled(){ fixedRtiaEl.disabled = autoRangeEl.checked; }
+autoRangeEl.addEventListener('change', syncFixedRtiaEnabled);
+syncFixedRtiaEnabled();
+
+function waveformPayload(){
+  return {
+    technique: 'DPV', // the only technique the firmware implements
+    startV: parseFloat(document.getElementById('startV').value),
+    endV: parseFloat(document.getElementById('endV').value),
+    stepMv: parseFloat(document.getElementById('stepMv').value),
+    pulseAmpMv: parseFloat(document.getElementById('pulseAmpMv').value),
+    pulseWidthMs: parseFloat(document.getElementById('pulseWidthMs').value),
+    intervalMs: parseFloat(document.getElementById('intervalMs').value),
+    equilibrationMs: parseFloat(document.getElementById('equilibrationMs').value),
+    label: document.getElementById('sampleLabel').value,
+    autoRange: autoRangeEl.checked,
+    fixedRtiaCode: parseInt(fixedRtiaEl.value, 10)
+  };
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (sweepRunning){ sendCmd('stop'); return; }
+  sendCmd('start', waveformPayload());
+});
+
+document.getElementById('presetBtn').addEventListener('click', () => {
+  sendCmd('save_preset', waveformPayload());
+});
+
+document.querySelectorAll('.switch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    sw.classList.toggle('on');
+    sendCmd('toggle', { key: sw.dataset.key, on: sw.classList.contains('on') });
+  });
+});
+
+document.getElementById('eraseBtn').addEventListener('click', () => {
+  if (confirm('Erase all saved results from the device?')) sendCmd('erase_results');
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  if (confirm('Restart the device now?')) sendCmd('restart');
+});
+document.getElementById('resultsFilter').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#resultsBody tr').forEach(tr => {
+    tr.style.display = tr.children[0].textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+/* ---------------- Item H: Wi-Fi networks modal ---------------- */
+// Renders the 4 slot rows. `ssids` (from the device's 'wifi_list' reply)
+// has exactly kMaxWifiNetworks entries, empty string for an unused slot.
+// Password fields always start blank — the device never sends stored
+// passwords back (see the modal's own in-page note).
+function renderWifiSlots(ssids){
+  const el = document.getElementById('wifiSlots');
+  el.innerHTML = '';
+  for (let i = 0; i < 4; i++){
+    const row = document.createElement('div');
+    row.className = 'wifi-slot';
+    row.innerHTML = `
+      <div><label>SSID ${i+1}</label><input id="wifiSsid${i}" value="${(ssids[i]||'').replace(/"/g,'&quot;')}"></div>
+      <div><label>Password (blank = unchanged)</label><input id="wifiPass${i}" type="password" placeholder="•••• leave blank to keep"></div>`;
+    el.appendChild(row);
+  }
+}
+
+function openWifiModal(){
+  document.getElementById('wifiModalBackdrop').style.display = 'flex';
+  sendCmd('list_wifi'); // refresh SSIDs (not passwords) every time it's opened
+}
+function closeWifiModal(){
+  document.getElementById('wifiModalBackdrop').style.display = 'none';
+}
+document.getElementById('deviceSettingsTab').addEventListener('click', openWifiModal);
+document.getElementById('wifiModalClose').addEventListener('click', closeWifiModal);
+document.getElementById('wifiModalBackdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'wifiModalBackdrop') closeWifiModal(); // click outside the panel = close
+});
+document.getElementById('wifiSaveBtn').addEventListener('click', () => {
+  const networks = [];
+  for (let i = 0; i < 4; i++){
+    networks.push({
+      ssid: document.getElementById(`wifiSsid${i}`).value,
+      pass: document.getElementById(`wifiPass${i}`).value // '' means "leave unchanged" server-side
+    });
+  }
+  sendCmd('save_wifi', { networks });
+  closeWifiModal();
+});
+
+wsConnect();
+// ask the device for anything it already has saved, once the socket is open
+setTimeout(() => sendCmd('list_results'), 500);
+</script>
+
+</body>
+</html>
